@@ -214,7 +214,12 @@ Promise
             if (func.detaileddescription[0].para) {
               R.forEach(
                 function (text) {
-                  func.description += text + " ";
+                  if (text._) {
+                    func.description += text._ + " ";
+                  }
+                  else {
+                    func.description += text + " ";
+                  }
                 },
                 func.detaileddescription[0].para
               )
