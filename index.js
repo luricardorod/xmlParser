@@ -42,7 +42,7 @@ function readNameSpaceFiles(filename) {
       .then(function (result) {
         var innerclasses = R.head(result.doxygen.compounddef).innerclass,
           readFilesPromises;
-
+        var kinds = [];
         readFilesPromises = R.map(
           function (innerclass) {
             return new Promise(function (resolve, reject) {
@@ -51,28 +51,50 @@ function readNameSpaceFiles(filename) {
                   return promesifyXMLParser(result);
                 })
                 .then(function (result) {
-                  var publicfunctions = [],
+                  var functions = [],
                     classDetail;
 
-                  if (R.head(result.doxygen.compounddef).sectiondef[1]) {
-                    publicfunctions = R.head(result.doxygen.compounddef).sectiondef[1].memberdef;
-
-                    publicfunctions = R.map(
-                      R.pick([
-                        'type',
-                        'definition',
-                        'argsstring',
-                        'name',
-                        'detaileddescription'
-                      ]),
-                      publicfunctions
+                  if (R.head(result.doxygen.compounddef).sectiondef) {
+                    var sections = R.head(result.doxygen.compounddef).sectiondef;
+                    /*console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                    console.log(innerclass.$.refid);
+                    R.forEach(
+                      function (lu) {
+                        console.log(lu.$.kind);
+                        var flago = R.findIndex(R.propEq('name', lu.$.kind))(kinds);
+                        if (flago === -1) {
+                          kinds.push({name: lu.$.kind});
+                        }
+                      },
+                      sections
                     );
-                  }
+                    console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                    console.log(kinds);*/
+                    R.forEach(
+                      function (section) {
+                        if (section.$.kind.search("func") > -1) {
+                          var tempFunctions = section.memberdef;
 
+                          tempFunctions = R.map(
+                            R.pick([
+                              'type',
+                              'definition',
+                              'argsstring',
+                              'name',
+                              'detaileddescription'
+                            ]),
+                            tempFunctions
+                          );
+                          functions = R.concat(functions, tempFunctions);
+                        }
+                      },
+                      sections
+                    )
+                  }
 
                   classDetail = {
                     name: innerclass._.substring(11, innerclass._.length),
-                    publicfunctions: publicfunctions
+                    functions: functions
                   };
 
                   resolve(classDetail);
@@ -84,7 +106,6 @@ function readNameSpaceFiles(filename) {
           },
           innerclasses
         );
-
         Promise
           .all(readFilesPromises)
           .then(resolveMain)
@@ -104,9 +125,9 @@ function readResultGoogleTest(filename) {
         return promesifyXMLParser(result);
       })
       .then(function (result) {
-        console.log(result);
         if (!result.testsuites.testsuite) {
-          resolveMain(testSuites);
+          resolveMain([]);
+          return;
         }
         var testSuites = R.map(
             function (test) {
@@ -119,18 +140,18 @@ function readResultGoogleTest(filename) {
                   tempTest.name = test.$.name;
                   return tempTest;
                 },
-                test.testcase
+                 test.testcase
               );
               testClass.testCases.name = test.name;
               return testClass;
             },
             result.testsuites.testsuite
           );
-        //testSuites = R.indexBy(R.prop('name'), testSuites);
         resolveMain(testSuites);
       })
       .catch(function (err) {
-        rejectMain(err);
+        var error = {error: true};
+        resolveMain(error);
       });
   });
   }
@@ -140,11 +161,40 @@ Promise
     readNameSpaceFiles('./../Drider-Engine/Docs/xml/namespacedrider_s_d_k.xml'),
     readResultGoogleTest('./../Drider-Engine/MathUnitTest/test_detail.xml'),
     readResultGoogleTest('./../Drider-Engine/GraphicsUnitTest/test_detail.xml'),
-    readResultGoogleTest('./../Drider-Engine/EngineUnitTest/test_detail.xml')
+    readResultGoogleTest('./../Drider-Engine/EngineUnitTest/test_detail.xml'),
+    readResultGoogleTest('./../Drider-Engine/CoreUnitTest/test_detail.xml')
   ])
   .then(function (responses) {
     var clases = responses[0],
-      tests = responses[1];//R.concat(R.concat(responses[1], responses[2]),responses[3]);
+      tests = [];//R.concat(R.concat(responses[1], responses[2]),responses[3]);
+      if (responses[1].error) {
+        console.log("no existe math unit test");
+      }
+      else {
+        console.log("Math cargado Correctamente");
+        tests = R.concat(tests, responses[1]);
+      }
+      if (responses[2].error) {
+        console.log("no existe Graphics unit test");
+      }
+      else {
+        console.log("Graphics cargado Correctamente");
+        tests = R.concat(tests, responses[2]);
+      }
+      if (responses[3].error) {
+        console.log("no existe Engine unit test");
+      }
+      else {
+        console.log("Engine cargado Correctamente");
+        tests = R.concat(tests, responses[3]);
+      }
+      if (responses[4].error) {
+        console.log("no existe Core unit test");
+      }
+      else {
+        console.log("Core cargado Correctamente");
+        tests = R.concat(tests, responses[4]);
+      }
     R.forEach(
       function (clase) {
         var indexTest = R.findIndex(R.propEq('name', clase.name))(tests);
@@ -191,12 +241,11 @@ Promise
             }
 
           },
-          clase.publicfunctions
+          clase.functions
         );
       },
       clases
     );
-    console.log(clases);
     fs.writeFile("../testGrid/demo/clases.json", JSON.stringify(clases));
   })
   .catch(function (err) {
