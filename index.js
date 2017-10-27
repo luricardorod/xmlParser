@@ -55,6 +55,11 @@ function readNameSpaceFiles(filename) {
                     classDetail;
 
                   if (R.head(result.doxygen.compounddef).sectiondef) {
+                    if (R.head(result.doxygen.compounddef).$.abstract) {
+                      resolve({
+                          name: "omit"
+                        });
+                    }
                     var sections = R.head(result.doxygen.compounddef).sectiondef;
                     /*console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
                     console.log(innerclass.$.refid);
@@ -91,7 +96,11 @@ function readNameSpaceFiles(filename) {
                       sections
                     )
                   }
-
+                  if (functions.length === 0) {
+                    resolve({
+                      name: "omit"
+                    });
+                  }
                   classDetail = {
                     name: innerclass._.substring(11, innerclass._.length),
                     functions: functions
@@ -195,8 +204,36 @@ Promise
         console.log("Core cargado Correctamente");
         tests = R.concat(tests, responses[4]);
       }
+    var tempClases = [];
+    var excludeClases = [
+        "Pool",
+        "Module",
+        "Logger",
+        'CommandBuffer',
+        'ComputeShader',
+        'DomainShader',
+        'FragmentShader',
+        'GeometryShader',
+        'HullShader',
+        'TeselationShader',
+        'TextureShader',
+        'VertexShader'
+      ];
+
     R.forEach(
       function (clase) {
+        if (clase.name === "omit") {
+          return;
+        }
+        var indexExcludeClasses = R.findIndex(
+            function (name) {
+              return name === clase.name;
+            },
+            excludeClases
+          );
+        if (indexExcludeClasses !== -1) {
+          return;
+        }
         var indexTest = R.findIndex(R.propEq('name', clase.name))(tests);
         if (indexTest < 0) {
           clase.testFile = "No existe Test con el nombre de la clase";
@@ -248,10 +285,11 @@ Promise
           },
           clase.functions
         );
+        tempClases.push(clase);
       },
       clases
     );
-    fs.writeFile("../testGrid/demo/clases.json", JSON.stringify(clases));
+    fs.writeFile("../testGrid/demo/clases.json", JSON.stringify(tempClases));
   })
   .catch(function (err) {
     console.log(err);
